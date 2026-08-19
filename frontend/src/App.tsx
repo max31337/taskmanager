@@ -1,38 +1,23 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import './App.css'
+import { ApiError, taskApi } from './api'
 import { TaskFilters } from './TaskFilters'
 import { TaskForm } from './TaskForm'
 import { TaskList } from './TaskList'
 import { TaskSearch } from './TaskSearch'
 import type { FilterType, Task } from './types'
 
-const initialTasks: Task[] = [
-  {
-    id: 1,
-    title: 'Review project brief',
-    description: 'Read the requirement summary and note important points.',
-    completed: false,
-  },
-  {
-    id: 2,
-    title: 'Prepare meeting notes',
-    description: 'Summarize the discussion and follow-up actions.',
-    completed: true,
-  },
-  {
-    id: 3,
-    title: 'Finish landing page mockup',
-    description: 'Complete the high-fidelity mockup for the homepage layout.',
-    completed: false,
-  },
-]
-
 type Notification = {
   message: string
+  tone: 'success' | 'error'
+}
+
+function messageFor(error: unknown) {
+  return error instanceof ApiError ? error.message : 'Something went wrong. Please try again.'
 }
 
 function App() {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [tasks, setTasks] = useState<Task[]>([])
   const [newTitle, setNewTitle] = useState('')
   const [newDescription, setNewDescription] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -42,6 +27,21 @@ function App() {
   const [editDescription, setEditDescription] = useState('')
   const [taskPendingDeletion, setTaskPendingDeletion] = useState<Task | null>(null)
   const [notification, setNotification] = useState<Notification | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadTasks() {
+      try {
+        setTasks(await taskApi.list())
+      } catch (error) {
+        setNotification({ message: messageFor(error), tone: 'error' })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    void loadTasks()
+  }, [])
 
   const filteredTasks = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
@@ -51,7 +51,6 @@ function App() {
         normalizedSearch.length === 0 ||
         task.title.toLowerCase().includes(normalizedSearch) ||
         task.description.toLowerCase().includes(normalizedSearch)
-
       const matchesFilter =
         activeFilter === 'all' ||
         (activeFilter === 'active' && !task.completed) ||
@@ -61,76 +60,61 @@ function App() {
     })
   }, [tasks, searchTerm, activeFilter])
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-
     const title = newTitle.trim()
     const description = newDescription.trim()
 
-    if (!title) {
-      return
+    if (!title) return
+
+    try {
+      const task = await taskApi.create({ title, description })
+      setTasks((currentTasks) => [task, ...currentTasks])
+      setNewTitle('')
+      setNewDescription('')
+      setNotification({ message: `Added "${title}".`, tone: 'success' })
+    } catch (error) {
+      setNotification({ message: messageFor(error), tone: 'error' })
     }
-
-    setTasks((currentTasks) => [
-      {
-        id: Date.now(),
-        title,
-        description,
-        completed: false,
-      },
-      ...currentTasks,
-    ])
-
-    setNewTitle('')
-    setNewDescription('')
-    setNotification({ message: `Added “${title}”.` })
   }
 
-  const toggleTask = (id: number) => {
-    setTasks((currentTasks) =>
-      currentTasks.map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task,
-      ),
-    )
+  const toggleTask = async (id: number) => {
+    const task = tasks.find((item) => item.id === id)
+    if (!task) return
+
+    try {
+      const updatedTask = await taskApi.update(id, { completed: !task.completed })
+      setTasks((currentTasks) => currentTasks.map((item) => (item.id === id ? updatedTask : item)))
+    } catch (error) {
+      setNotification({ message: messageFor(error), tone: 'error' })
+    }
   }
 
   const removeTask = (id: number) => {
     const task = tasks.find((item) => item.id === id)
-
-    if (!task) {
-      return
-    }
-
-    setTaskPendingDeletion(task)
+    if (task) setTaskPendingDeletion(task)
   }
 
-  const confirmRemoveTask = () => {
-    if (!taskPendingDeletion) {
-      return
+  const confirmRemoveTask = async () => {
+    if (!taskPendingDeletion) return
+
+    const { id, title } = taskPendingDeletion
+    try {
+      await taskApi.remove(id)
+      setTasks((currentTasks) => currentTasks.filter((task) => task.id !== id))
+      if (editingTaskId === id) setEditingTaskId(null)
+      setTaskPendingDeletion(null)
+      setNotification({ message: `Deleted "${title}".`, tone: 'success' })
+    } catch (error) {
+      setNotification({ message: messageFor(error), tone: 'error' })
     }
-
-    const { id } = taskPendingDeletion
-    setTasks((currentTasks) => currentTasks.filter((task) => task.id !== id))
-
-    if (editingTaskId === id) {
-      setEditingTaskId(null)
-      setEditTitle('')
-      setEditDescription('')
-    }
-
-    setTaskPendingDeletion(null)
-    setNotification({ message: `Deleted “${taskPendingDeletion.title}”.` })
   }
 
   useEffect(() => {
-    if (!taskPendingDeletion) {
-      return
-    }
+    if (!taskPendingDeletion) return
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setTaskPendingDeletion(null)
-      }
+      if (event.key === 'Escape') setTaskPendingDeletion(null)
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -138,44 +122,35 @@ function App() {
   }, [taskPendingDeletion])
 
   useEffect(() => {
-    if (!notification) {
-      return
-    }
-
+    if (!notification) return
     const timeout = window.setTimeout(() => setNotification(null), 3500)
     return () => window.clearTimeout(timeout)
   }, [notification])
 
   const startEditing = (id: number) => {
     const task = tasks.find((item) => item.id === id)
-
-    if (!task) {
-      return
-    }
+    if (!task) return
 
     setEditingTaskId(id)
     setEditTitle(task.title)
     setEditDescription(task.description)
   }
 
-  const saveEditedTask = (id: number) => {
+  const saveEditedTask = async (id: number) => {
     const title = editTitle.trim()
     const description = editDescription.trim()
+    if (!title) return
 
-    if (!title) {
-      return
+    try {
+      const updatedTask = await taskApi.update(id, { title, description })
+      setTasks((currentTasks) => currentTasks.map((task) => (task.id === id ? updatedTask : task)))
+      setEditingTaskId(null)
+      setEditTitle('')
+      setEditDescription('')
+      setNotification({ message: `Saved changes to "${title}".`, tone: 'success' })
+    } catch (error) {
+      setNotification({ message: messageFor(error), tone: 'error' })
     }
-
-    setTasks((currentTasks) =>
-      currentTasks.map((task) =>
-        task.id === id ? { ...task, title, description } : task,
-      ),
-    )
-
-    setEditingTaskId(null)
-    setEditTitle('')
-    setEditDescription('')
-    setNotification({ message: `Saved changes to “${title}”.` })
   }
 
   const cancelEdit = () => {
@@ -196,20 +171,14 @@ function App() {
             <h1 id="page-title">Tasks</h1>
           </div>
           <p className="task-summary">
-            <strong>{activeTasks}</strong> open <span aria-hidden="true">·</span> {completedTasks} complete
+            <strong>{activeTasks}</strong> open <span aria-hidden="true">&middot;</span> {completedTasks} complete
           </p>
         </div>
 
         <div className="workspace-grid">
           <aside className="task-composer" aria-label="Create a task">
             <p className="section-label">Add an item</p>
-            <TaskForm
-              title={newTitle}
-              description={newDescription}
-              onTitleChange={setNewTitle}
-              onDescriptionChange={setNewDescription}
-              onSubmit={handleSubmit}
-            />
+            <TaskForm title={newTitle} description={newDescription} onTitleChange={setNewTitle} onDescriptionChange={setNewDescription} onSubmit={handleSubmit} />
           </aside>
 
           <section className="task-workspace" aria-label="Task list">
@@ -220,58 +189,36 @@ function App() {
 
             <div className="list-heading">
               <p className="section-label">{activeFilter === 'all' ? 'All items' : activeFilter === 'active' ? 'Open items' : 'Completed items'}</p>
-              <span>{filteredTasks.length} shown</span>
+              <span>{isLoading ? 'Loading' : `${filteredTasks.length} shown`}</span>
             </div>
 
-            <TaskList
-              tasks={filteredTasks}
-              editingTaskId={editingTaskId}
-              editTitle={editTitle}
-              editDescription={editDescription}
-              onToggle={toggleTask}
-              onDelete={removeTask}
-              onEdit={startEditing}
-              onEditTitleChange={setEditTitle}
-              onEditDescriptionChange={setEditDescription}
-              onSaveEdit={saveEditedTask}
-              onCancelEdit={cancelEdit}
-            />
+            {isLoading ? (
+              <p className="loading-state" aria-live="polite">Loading tasks...</p>
+            ) : (
+              <TaskList tasks={filteredTasks} editingTaskId={editingTaskId} editTitle={editTitle} editDescription={editDescription} onToggle={toggleTask} onDelete={removeTask} onEdit={startEditing} onEditTitleChange={setEditTitle} onEditDescriptionChange={setEditDescription} onSaveEdit={saveEditedTask} onCancelEdit={cancelEdit} />
+            )}
           </section>
         </div>
       </section>
 
       {taskPendingDeletion && (
         <div className="confirmation-backdrop" role="presentation">
-          <section
-            className="confirmation-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-dialog-title"
-            aria-describedby="delete-dialog-description"
-          >
+          <section className="confirmation-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description">
             <p className="section-label">Remove item</p>
             <h2 id="delete-dialog-title">Delete this task?</h2>
-            <p id="delete-dialog-description">
-              “{taskPendingDeletion.title}” will be removed permanently.
-            </p>
+            <p id="delete-dialog-description">"{taskPendingDeletion.title}" will be removed permanently.</p>
             <div className="confirmation-actions">
-              <button type="button" className="secondary-button" onClick={() => setTaskPendingDeletion(null)}>
-                Keep task
-              </button>
-              <button type="button" className="delete-confirm-button" onClick={confirmRemoveTask}>
-                Delete task
-              </button>
+              <button type="button" className="secondary-button" onClick={() => setTaskPendingDeletion(null)}>Keep task</button>
+              <button type="button" className="delete-confirm-button" onClick={confirmRemoveTask}>Delete task</button>
             </div>
           </section>
         </div>
       )}
 
       {notification && (
-        <div className="toast" role="status" aria-live="polite">
+        <div className={`toast ${notification.tone === 'error' ? 'is-error' : ''}`} role="status" aria-live="polite">
           <span>{notification.message}</span>
-          <button type="button" onClick={() => setNotification(null)} aria-label="Dismiss notification">
-            Dismiss
-          </button>
+          <button type="button" onClick={() => setNotification(null)} aria-label="Dismiss notification">Dismiss</button>
         </div>
       )}
     </main>

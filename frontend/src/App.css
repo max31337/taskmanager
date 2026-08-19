@@ -302,6 +302,14 @@ button {
   text-align: left;
 }
 
+.loading-state {
+  margin: 0;
+  padding: 26px 0;
+  border-top: 1px solid #c8c6bf;
+  color: #777872;
+  font-size: 0.86rem;
+}
+
 .confirmation-backdrop {
   position: fixed;
   inset: 0;
@@ -383,6 +391,11 @@ button {
 
 .toast button:hover {
   border-bottom-color: #fff;
+}
+
+.toast.is-error {
+  border-color: #8b3024;
+  background: #782d22;
 }
 
 @keyframes toast-in {
