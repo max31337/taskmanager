@@ -5,6 +5,7 @@ type TaskItemProps = {
   isEditing: boolean
   editTitle: string
   editDescription: string
+  isTogglePending: boolean
   onToggle: (id: number) => void
   onDelete: (id: number) => void
   onEdit: (id: number) => void
@@ -19,6 +20,7 @@ export function TaskItem({
   isEditing,
   editTitle,
   editDescription,
+  isTogglePending,
   onToggle,
   onDelete,
   onEdit,
@@ -58,12 +60,13 @@ export function TaskItem({
   }
 
   return (
-    <li className={`task-item ${task.completed ? 'is-done' : ''}`}>
+    <li className={`task-item ${task.completed ? 'is-done' : ''}`} aria-busy={isTogglePending}>
       <label className="task-check">
         <input
           type="checkbox"
           checked={task.completed}
           onChange={() => onToggle(task.id)}
+          disabled={isTogglePending}
         />
         <div className="task-text">
           <span>{task.title}</span>

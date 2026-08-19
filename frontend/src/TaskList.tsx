@@ -6,6 +6,7 @@ type TaskListProps = {
   editingTaskId: number | null
   editTitle: string
   editDescription: string
+  pendingToggleId: number | null
   onToggle: (id: number) => void
   onDelete: (id: number) => void
   onEdit: (id: number) => void
@@ -20,6 +21,7 @@ export function TaskList({
   editingTaskId,
   editTitle,
   editDescription,
+  pendingToggleId,
   onToggle,
   onDelete,
   onEdit,
@@ -40,6 +42,7 @@ export function TaskList({
             isEditing={editingTaskId === task.id}
             editTitle={editTitle}
             editDescription={editDescription}
+            isTogglePending={pendingToggleId === task.id}
             onToggle={onToggle}
             onDelete={onDelete}
             onEdit={onEdit}

@@ -10,6 +10,10 @@ import type { FilterType, Task } from './types'
 type Notification = {
   message: string
   tone: 'success' | 'error'
+  action?: {
+    label: string
+    onClick: () => void
+  }
 }
 
 function messageFor(error: unknown) {
@@ -28,6 +32,7 @@ function App() {
   const [taskPendingDeletion, setTaskPendingDeletion] = useState<Task | null>(null)
   const [notification, setNotification] = useState<Notification | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [pendingToggleId, setPendingToggleId] = useState<number | null>(null)
 
   useEffect(() => {
     async function loadTasks() {
@@ -78,16 +83,35 @@ function App() {
     }
   }
 
-  const toggleTask = async (id: number) => {
+  const updateTaskCompletion = async (id: number, completed: boolean, offerUndo: boolean) => {
     const task = tasks.find((item) => item.id === id)
     if (!task) return
 
+    setPendingToggleId(id)
     try {
-      const updatedTask = await taskApi.update(id, { completed: !task.completed })
+      const updatedTask = await taskApi.update(id, { completed })
       setTasks((currentTasks) => currentTasks.map((item) => (item.id === id ? updatedTask : item)))
+
+      setNotification({
+        message: completed ? `Marked "${task.title}" complete.` : `Marked "${task.title}" incomplete.`,
+        tone: 'success',
+        action: offerUndo
+          ? {
+              label: 'Undo',
+              onClick: () => void updateTaskCompletion(id, !completed, false),
+            }
+          : undefined,
+      })
     } catch (error) {
       setNotification({ message: messageFor(error), tone: 'error' })
+    } finally {
+      setPendingToggleId(null)
     }
+  }
+
+  const toggleTask = (id: number) => {
+    const task = tasks.find((item) => item.id === id)
+    if (task) void updateTaskCompletion(id, !task.completed, !task.completed)
   }
 
   const removeTask = (id: number) => {
@@ -195,7 +219,7 @@ function App() {
             {isLoading ? (
               <p className="loading-state" aria-live="polite">Loading tasks...</p>
             ) : (
-              <TaskList tasks={filteredTasks} editingTaskId={editingTaskId} editTitle={editTitle} editDescription={editDescription} onToggle={toggleTask} onDelete={removeTask} onEdit={startEditing} onEditTitleChange={setEditTitle} onEditDescriptionChange={setEditDescription} onSaveEdit={saveEditedTask} onCancelEdit={cancelEdit} />
+              <TaskList tasks={filteredTasks} editingTaskId={editingTaskId} editTitle={editTitle} editDescription={editDescription} pendingToggleId={pendingToggleId} onToggle={toggleTask} onDelete={removeTask} onEdit={startEditing} onEditTitleChange={setEditTitle} onEditDescriptionChange={setEditDescription} onSaveEdit={saveEditedTask} onCancelEdit={cancelEdit} />
             )}
           </section>
         </div>
@@ -218,6 +242,18 @@ function App() {
       {notification && (
         <div className={`toast ${notification.tone === 'error' ? 'is-error' : ''}`} role="status" aria-live="polite">
           <span>{notification.message}</span>
+          {notification.action && (
+            <button
+              type="button"
+              className="toast-action"
+              onClick={() => {
+                notification.action?.onClick()
+                setNotification(null)
+              }}
+            >
+              {notification.action.label}
+            </button>
+          )}
           <button type="button" onClick={() => setNotification(null)} aria-label="Dismiss notification">Dismiss</button>
         </div>
       )}
