@@ -57,7 +57,7 @@ export async function removeTask(request: Request, response: Response, next: Nex
     if (!deleted) {
       return response.status(404).json({ error: 'Task not found.' })
     }
-    return response.status(204).send()
+    return response.status(204).json({ message: 'Task "${deleted.title}" deleted.' })
   } catch (error) {
     return next(error)
   }
