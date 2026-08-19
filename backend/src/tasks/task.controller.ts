@@ -18,7 +18,7 @@ export async function postTask(request: Request, response: Response, next: NextF
 
   try {
     const task = await taskRepository.createTask(validation.value)
-    return response.status(201).json({ message: 'Task created.', task })
+    return response.status(201).json(task)
   } catch (error) {
     return next(error)
   }
@@ -40,7 +40,7 @@ export async function patchTask(request: Request, response: Response, next: Next
     if (!task) {
       return response.status(404).json({ error: 'Task not found.' })
     }
-    return response.json( { message: 'Task "${task.title}" updated.', task })
+    return response.json(task)
   } catch (error) {
     return next(error)
   }
@@ -57,7 +57,7 @@ export async function removeTask(request: Request, response: Response, next: Nex
     if (!deleted) {
       return response.status(404).json({ error: 'Task not found.' })
     }
-    return response.status(204).json({ message: 'Task "${deleted.title}" deleted.' })
+    return response.status(204).send()
   } catch (error) {
     return next(error)
   }
