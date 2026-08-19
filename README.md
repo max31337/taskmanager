@@ -107,7 +107,7 @@ VITE_API_URL=http://localhost:3001/api
 | `GET` | `/api/tasks` | Get all tasks |
 | `POST` | `/api/tasks` | Create a task |
 | `PATCH` | `/api/tasks/:id` | Update a task's title, description, or completion state |
-| `DELETE` | `/api/tasks/:id` | Delete a task and return a success message |
+| `DELETE` | `/api/tasks/:id` | Delete a task and return `204 No Content` |
 
 ## Dependencies
 
