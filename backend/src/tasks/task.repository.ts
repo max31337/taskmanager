@@ -51,6 +51,6 @@ export async function updateTask(id: string, updates: UpdateTaskInput): Promise<
 }
 
 export async function deleteTask(id: string): Promise<boolean> {
-  const result = await pool.query('DELETE FROM tasks WHERE id = $1 RETURNING id', [id])
+  const result = await pool.query('DELETE FROM tasks WHERE id = $1 RETURNING *', [id])
   return result.rowCount === 1
 }
