@@ -40,7 +40,7 @@ export async function patchTask(request: Request, response: Response, next: Next
     if (!task) {
       return response.status(404).json({ error: 'Task not found.' })
     }
-    return response.json(task)
+    return response.json( { message: 'Task "${task.title}" updated.', task })
   } catch (error) {
     return next(error)
   }
