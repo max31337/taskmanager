@@ -122,13 +122,13 @@ function App() {
   const confirmRemoveTask = async () => {
     if (!taskPendingDeletion) return
 
-    const { id, title } = taskPendingDeletion
+    const { id } = taskPendingDeletion
     try {
       await taskApi.remove(id)
       setTasks((currentTasks) => currentTasks.filter((task) => task.id !== id))
       if (editingTaskId === id) setEditingTaskId(null)
       setTaskPendingDeletion(null)
-      setNotification({ message: `Deleted "${title}".`, tone: 'success' })
+      setNotification({ message: 'Task deleted.', tone: 'success' })
     } catch (error) {
       setNotification({ message: messageFor(error), tone: 'error' })
     }
