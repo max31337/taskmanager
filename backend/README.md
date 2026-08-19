@@ -3,7 +3,7 @@
 ## Setup
 
 1. Copy `.env.example` to `.env` and set `DATABASE_URL` for your local PostgreSQL database.
-2. Create a database named `taskmanager`.
+2. Create a database named `taskmanagerdb`.
 3. Run the SQL in `db/schema.sql` against that database.
 4. Run `npm install`, then `npm run dev`. Use `npm run build` to compile TypeScript for production.
 
