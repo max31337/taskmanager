@@ -18,7 +18,7 @@ export async function postTask(request: Request, response: Response, next: NextF
 
   try {
     const task = await taskRepository.createTask(validation.value)
-    return response.status(201).json(task)
+    return response.status(201).json({ message: 'Task created.', task })
   } catch (error) {
     return next(error)
   }
